@@ -365,56 +365,99 @@ func main() {
 	//     fmt.Printf("Function result: %+v\n", result)
 	// }
 	
-	// Example using OpenAI SDK
+	// Example using OpenAI SDK with modern Tools API
 	ctx := context.Background()
 	client := openai.NewClient()
 	
-	// Prepare functions for OpenAI
-	var openAIFuncs []openai.ChatCompletionFunction
+	question := "What pets are available with limit 5?"
+	
+	print("> ")
+	println(question)
+	
+	// Prepare tools for OpenAI
+	var tools []openai.ChatCompletionToolUnionParam
 	for _, fn := range functions {
-		jsonBytes, _ := json.Marshal(fn.Parameters)
-		openAIFuncs = append(openAIFuncs, openai.ChatCompletionFunction{
+		// Convert parameters to the expected format
+		params := fn.Parameters.(map[string]interface{})
+		tools = append(tools, openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
 			Name:        fn.Name,
-			Description: &fn.Description,
-			Parameters:  jsonBytes,
-		})
+			Description: openai.String(fn.Description),
+			Parameters: openai.FunctionParameters{
+				"type":       params["type"].(string),
+				"properties": params["properties"].(map[string]interface{}),
+				"required":   params["required"].([]string),
+			},
+		}))
 	}
 	
 	// Make request to OpenAI
-	resp, err := client.Chat.Completions.New(
+	completion, err := client.Chat.Completions.New(
 		ctx,
 		openai.ChatCompletionNewParams{
-			Model: openai.F(openai.ChatModelGPT4Turbo),
+			Model: openai.ChatModelGPT4o,
 			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.NewUserMessage("What pets are available with limit 5?"),
+				openai.UserMessage(question),
 			},
-			Functions: openAIFuncs,
+			Tools: tools,
+			Seed:  openai.Int(0),
 		},
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	
-	// Handle function call response
-	for _, choice := range resp.Choices {
-		if choice.Message.FunctionCall != nil {
-			fmt.Printf("Function call: %s\n", *choice.Message.FunctionCall.Name)
-			fmt.Printf("Arguments: %s\n", *choice.Message.FunctionCall.Arguments)
-			
-			// Parse arguments
-			var args map[string]interface{}
-			if err := json.Unmarshal([]byte(*choice.Message.FunctionCall.Arguments), &args); err != nil {
-				log.Printf("Error parsing arguments: %v", err)
-				continue
-			}
-			
-			// Execute the function
-			result, err := ExecuteFunction(*choice.Message.FunctionCall.Name, args)
-			if err != nil {
-				log.Printf("Error executing function: %v", err)
-			} else {
-				fmt.Printf("Function result: %+v\n", result)
-			}
+	toolCalls := completion.Choices[0].Message.ToolCalls
+	
+	// Return early if there are no tool calls
+	if len(toolCalls) == 0 {
+		fmt.Printf("No function call")
+		return
+	}
+	
+	// If there was a function call, continue the conversation
+	params := openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4o,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(question),
+		},
+		Tools: tools,
+		Seed:  openai.Int(0),
+	}
+	
+	params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
+	for _, toolCall := range toolCalls {
+		// Parse arguments
+		var args map[string]interface{}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+			log.Printf("Error parsing arguments: %v", err)
+			continue
+		}
+		
+		// Execute the function
+		result, err := ExecuteFunction(toolCall.Function.Name, args)
+		if err != nil {
+			log.Printf("Error executing function: %v", err)
+			// Send error message back
+			params.Messages = append(params.Messages, openai.ToolMessage(
+				fmt.Sprintf("Error executing function: %v", err),
+				toolCall.ID,
+			))
+		} else {
+			fmt.Printf("Function %s result: %+v\n", toolCall.Function.Name, result)
+			// Send result back to the model
+			resultJSON, _ := json.Marshal(result)
+			params.Messages = append(params.Messages, openai.ToolMessage(
+				string(resultJSON),
+				toolCall.ID,
+			))
 		}
 	}
+	
+	// Get final response
+	completion, err = client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	println(completion.Choices[0].Message.Content)
 }
