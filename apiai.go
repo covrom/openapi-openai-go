@@ -27,11 +27,13 @@ func NewAPIClient(baseURL string, authConfig *AuthConfig, opts ...func(*http.Cli
 
 // FunctionDefinition represents an LLM function definition
 type FunctionDefinition struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Parameters  Schema `json:"parameters"`
-	OapiMethod  string `json:"-"`
-	OapiPath    string `json:"-"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Parameters  Schema   `json:"parameters"`
+	OapiMethod  string   `json:"-"`
+	OapiPath    string   `json:"-"`
+	PathParams  []string `json:"-"`
+	QueryParams []string `json:"-"`
 }
 
 // OpenAPISpec represents an OpenAPI 3.x specification
@@ -138,6 +140,8 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 				Required:   []string{},
 			}
 
+			var pathParams, queryParams []string
+
 			// Handle path and query parameters
 			for _, param := range op.Parameters {
 				if param.In == "path" || param.In == "query" {
@@ -147,6 +151,12 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 
 					if param.Required {
 						params.Required = append(params.Required, param.Name)
+					}
+
+					if param.In == "path" {
+						pathParams = append(pathParams, param.Name)
+					} else {
+						queryParams = append(queryParams, param.Name)
 					}
 				}
 			}
@@ -162,6 +172,9 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 			}
 
 			funcDef.Parameters = params
+			funcDef.PathParams = pathParams
+			funcDef.QueryParams = queryParams
+
 			functions[funcDef.Name] = funcDef
 		}
 	}

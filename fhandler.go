@@ -14,8 +14,21 @@ func executeAPIRequest(client *APIClient, fn *FunctionDefinition, requestBody an
 	// Build URL with path parameters
 	u := client.BaseURL.JoinPath(fn.OapiPath).String()
 
-	for key, value := range args {
-		u = strings.ReplaceAll(u, fmt.Sprintf("{%s}", key), url.PathEscape(fmt.Sprint(value)))
+	for _, pp := range fn.PathParams {
+		u = strings.ReplaceAll(u, fmt.Sprintf("{%s}", pp), url.PathEscape(fmt.Sprint(args[pp])))
+	}
+
+	if len(fn.QueryParams) > 0 {
+		uu, err := url.Parse(u)
+		if err != nil {
+			return nil, err
+		}
+		uq := uu.Query()
+		for _, qp := range fn.QueryParams {
+			uq.Set(qp, fmt.Sprint(args[qp]))
+		}
+		uu.RawQuery = uq.Encode()
+		u = uu.String()
 	}
 
 	var body []byte
