@@ -1,34 +1,34 @@
 package apiai
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 // Execute API request
-func executeAPIRequest(client *APIClient, fn *FunctionDefinition, args map[string]any) (any, error) {
+func executeAPIRequest(client *APIClient, fn *FunctionDefinition, requestBody any, args map[string]any) (any, error) {
 	// Build URL with path parameters
-	url := client.BaseURL + fn.OapiPath
+	u := client.BaseURL.JoinPath(fn.OapiPath).String()
 
 	for key, value := range args {
-		if strings.Contains(url, "{"+key+"}") {
-			url = strings.ReplaceAll(url, "{"+key+"}", fmt.Sprintf("%v", value))
-		}
+		u = strings.ReplaceAll(u, fmt.Sprintf("{%s}", key), url.PathEscape(fmt.Sprint(value)))
 	}
 
 	var body []byte
 	var err error
 
-	if requestBody, ok := args["requestBody"]; ok {
+	if requestBody != nil {
 		body, err = json.Marshal(requestBody)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	req, err := http.NewRequest(fn.OapiMethod, url, strings.NewReader(string(body)))
+	req, err := http.NewRequest(fn.OapiMethod, u, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -53,5 +53,7 @@ func executeAPIRequest(client *APIClient, fn *FunctionDefinition, args map[strin
 
 // ExecuteFunction calls the registered function handler
 func ExecuteFunction(client *APIClient, fn *FunctionDefinition, arguments map[string]any) (any, error) {
-	return executeAPIRequest(client, fn, arguments)
+	requestBody := arguments["requestBody"]
+
+	return executeAPIRequest(client, fn, requestBody, arguments)
 }

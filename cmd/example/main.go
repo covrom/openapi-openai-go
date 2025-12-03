@@ -163,7 +163,10 @@ func main() {
 		Seed:  openai.Int(0),
 	}
 
-	cli := apiai.NewAPIClient("https://petstore.swagger.io/v2")
+	cli, err := apiai.NewAPIClient("https://petstore.swagger.io/v2", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
 	for _, toolCall := range toolCalls {

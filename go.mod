@@ -2,7 +2,10 @@ module github.com/covrom/openapi-openai-go
 
 go 1.25.4
 
-require github.com/openai/openai-go/v3 v3.9.0
+require (
+	github.com/openai/openai-go/v3 v3.9.0
+	golang.org/x/oauth2 v0.33.0
+)
 
 require (
 	github.com/tidwall/gjson v1.18.0 // indirect

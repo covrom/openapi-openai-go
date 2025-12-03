@@ -2,21 +2,27 @@ package apiai
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 // APIClient handles HTTP requests to the API
 type APIClient struct {
-	BaseURL    string
-	HTTPClient *http.Client
+	BaseURL    *url.URL
+	HTTPClient *http.Client // change this to client with authenticate
 }
 
 // NewAPIClient creates a new API client
-func NewAPIClient(baseURL string) *APIClient {
-	return &APIClient{
-		BaseURL:    baseURL,
-		HTTPClient: &http.Client{},
+func NewAPIClient(baseURL string, authConfig *AuthConfig, opts ...func(*http.Client)) (*APIClient, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
 	}
+	cli := NewHTTPClient(authConfig, opts...)
+	return &APIClient{
+		BaseURL:    u,
+		HTTPClient: cli,
+	}, nil
 }
 
 // FunctionDefinition represents an LLM function definition
