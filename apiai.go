@@ -126,9 +126,14 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 				continue
 			}
 
+			desc := op.Summary
+			if len(op.Description) > 0 {
+				desc = desc + "\n" + op.Description
+			}
+
 			funcDef := &FunctionDefinition{
 				Name:        sanitizeFunctionName(path, method),
-				Description: strings.Join([]string{op.Summary, op.Description}, "\n"),
+				Description: desc,
 				OapiMethod:  method,
 				OapiPath:    path,
 			}
