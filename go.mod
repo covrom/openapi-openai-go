@@ -5,6 +5,7 @@ go 1.25.4
 require (
 	github.com/openai/openai-go/v3 v3.9.0
 	golang.org/x/oauth2 v0.33.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

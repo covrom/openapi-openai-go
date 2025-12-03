@@ -203,3 +203,123 @@ func TestConvertOpenAPIToFunctionsWithRefs(t *testing.T) {
 		t.Errorf("Expected 2 parameters for teams, got %d", len(teamsFunc.Parameters.Properties))
 	}
 }
+
+func TestUnmarshalOpenAPISpecFromYAML(t *testing.T) {
+	// Test YAML data
+	specYAML := `
+openapi: 3.0.0
+info:
+  title: Test API
+  description: A test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      summary: Get test data
+      description: Returns test data
+      parameters:
+        - name: id
+          in: query
+          description: Test ID
+          required: true
+          schema:
+            type: string
+`
+
+	// Test YAML unmarshaling
+	spec, err := UnmarshalOpenAPISpecFromYAML([]byte(specYAML))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal YAML: %v", err)
+	}
+
+	// Verify the unmarshaled data
+	if spec.Info.Title != "Test API" {
+		t.Errorf("Expected title 'Test API', got '%s'", spec.Info.Title)
+	}
+
+	if spec.Info.Version != "1.0.0" {
+		t.Errorf("Expected version '1.0.0', got '%s'", spec.Info.Version)
+	}
+
+	if len(spec.Paths) != 1 {
+		t.Errorf("Expected 1 path, got %d", len(spec.Paths))
+	}
+
+	testPath, exists := spec.Paths["/test"]
+	if !exists {
+		t.Errorf("Expected /test path to exist")
+	}
+
+	if testPath.Get == nil {
+		t.Errorf("Expected GET operation to exist")
+	}
+
+	if testPath.Get.Summary != "Get test data" {
+		t.Errorf("Expected summary 'Get test data', got '%s'", testPath.Get.Summary)
+	}
+
+	// Test conversion to functions
+	functions := ConvertOpenAPIToFunctions(spec)
+	if len(functions) != 1 {
+		t.Errorf("Expected 1 function, got %d", len(functions))
+	}
+
+	testFunc, exists := functions["get_test"]
+	if !exists {
+		t.Errorf("Expected get_test function to exist")
+	}
+
+	if testFunc.Description != "Get test data\nReturns test data" {
+		t.Errorf("Expected description 'Get test data\nReturns test data', got '%s'", testFunc.Description)
+	}
+}
+
+func TestUnmarshalOpenAPISpecAutoDetect(t *testing.T) {
+	// Test JSON data
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "JSON Test API",
+			"version": "1.0.0"
+		},
+		"paths": {
+			"/json": {
+				"get": {
+					"summary": "JSON test endpoint"
+				}
+			}
+		}
+	}`
+
+	// Test JSON auto-detection
+	spec, err := UnmarshalOpenAPISpec([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON with auto-detect: %v", err)
+	}
+
+	if spec.Info.Title != "JSON Test API" {
+		t.Errorf("Expected title 'JSON Test API', got '%s'", spec.Info.Title)
+	}
+
+	// Test YAML data
+	specYAML := `
+openapi: 3.0.0
+info:
+  title: YAML Test API
+  version: 1.0.0
+paths:
+  /yaml:
+    get:
+      summary: YAML test endpoint
+`
+
+	// Test YAML auto-detection
+	spec, err = UnmarshalOpenAPISpec([]byte(specYAML))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal YAML with auto-detect: %v", err)
+	}
+
+	if spec.Info.Title != "YAML Test API" {
+		t.Errorf("Expected title 'YAML Test API', got '%s'", spec.Info.Title)
+	}
+}

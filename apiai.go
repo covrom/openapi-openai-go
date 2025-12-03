@@ -1,9 +1,12 @@
 package apiai
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // APIClient handles HTTP requests to the API
@@ -27,42 +30,42 @@ func NewAPIClient(baseURL string, authConfig *AuthConfig, opts ...func(*http.Cli
 
 // FunctionDefinition represents an LLM function definition
 type FunctionDefinition struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Parameters  Schema   `json:"parameters"`
-	OapiMethod  string   `json:"-"`
-	OapiPath    string   `json:"-"`
-	PathParams  []string `json:"-"`
-	QueryParams []string `json:"-"`
+	Name        string   `json:"name" yaml:"name"`
+	Description string   `json:"description" yaml:"description"`
+	Parameters  Schema   `json:"parameters" yaml:"parameters"`
+	OapiMethod  string   `json:"-" yaml:"-"`
+	OapiPath    string   `json:"-" yaml:"-"`
+	PathParams  []string `json:"-" yaml:"-"`
+	QueryParams []string `json:"-" yaml:"-"`
 }
 
 // OpenAPISpec represents an OpenAPI 3.x specification
 type OpenAPISpec struct {
-	OpenAPI    string              `json:"openapi"`
-	Paths      map[string]PathItem `json:"paths"`
-	Info       Info                `json:"info"`
-	Components *Components         `json:"components,omitempty"`
+	OpenAPI    string              `json:"openapi" yaml:"openapi"`
+	Paths      map[string]PathItem `json:"paths" yaml:"paths"`
+	Info       Info                `json:"info" yaml:"info"`
+	Components *Components         `json:"components,omitempty" yaml:"components,omitempty"`
 }
 
 // Info contains API metadata
 type Info struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Version     string `json:"version"`
+	Title       string `json:"title" yaml:"title"`
+	Description string `json:"description" yaml:"description"`
+	Version     string `json:"version" yaml:"version"`
 }
 
 // Components contains reusable objects
 type Components struct {
-	Parameters map[string]Parameter `json:"parameters,omitempty"`
+	Parameters map[string]Parameter `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 }
 
 // PathItem represents a path in the OpenAPI spec
 type PathItem struct {
-	Get    *Operation `json:"get"`
-	Post   *Operation `json:"post"`
-	Put    *Operation `json:"put"`
-	Delete *Operation `json:"delete"`
-	Patch  *Operation `json:"patch"`
+	Get    *Operation `json:"get" yaml:"get"`
+	Post   *Operation `json:"post" yaml:"post"`
+	Put    *Operation `json:"put" yaml:"put"`
+	Delete *Operation `json:"delete" yaml:"delete"`
+	Patch  *Operation `json:"patch" yaml:"patch"`
 }
 
 // Helper to get operations from path item
@@ -88,39 +91,39 @@ func (p *PathItem) getOperations() map[string]*Operation {
 
 // Operation represents an API operation
 type Operation struct {
-	Summary     string       `json:"summary"`
-	Description string       `json:"description"`
-	Parameters  []Parameter  `json:"parameters,omitempty"`
-	RequestBody *RequestBody `json:"requestBody,omitempty"`
+	Summary     string       `json:"summary" yaml:"summary"`
+	Description string       `json:"description" yaml:"description"`
+	Parameters  []Parameter  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	RequestBody *RequestBody `json:"requestBody,omitempty" yaml:"requestBody,omitempty"`
 }
 
 // Parameter represents an API parameter
 type Parameter struct {
-	Name        string  `json:"name"`
-	In          string  `json:"in"`
-	Description string  `json:"description"`
-	Required    bool    `json:"required"`
-	Schema      *Schema `json:"schema"`
-	Ref         string  `json:"$ref,omitempty"`
+	Name        string  `json:"name" yaml:"name"`
+	In          string  `json:"in" yaml:"in"`
+	Description string  `json:"description" yaml:"description"`
+	Required    bool    `json:"required" yaml:"required"`
+	Schema      *Schema `json:"schema" yaml:"schema"`
+	Ref         string  `json:"$ref,omitempty" yaml:"$ref,omitempty"`
 }
 
 // RequestBody represents the request body definition
 type RequestBody struct {
-	Content map[string]MediaType `json:"content"`
+	Content map[string]MediaType `json:"content" yaml:"content"`
 }
 
 // MediaType represents media type in request/response body
 type MediaType struct {
-	Schema *Schema `json:"schema"`
+	Schema *Schema `json:"schema" yaml:"schema"`
 }
 
 // Schema represents JSON Schema
 type Schema struct {
-	Type        string             `json:"type"`
-	Properties  map[string]*Schema `json:"properties,omitempty"`
-	Required    []string           `json:"required,omitempty"`
-	Format      string             `json:"format,omitempty"`
-	Description string             `json:"description,omitempty"`
+	Type        string             `json:"type" yaml:"type"`
+	Properties  map[string]*Schema `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Required    []string           `json:"required,omitempty" yaml:"required,omitempty"`
+	Format      string             `json:"format,omitempty" yaml:"format,omitempty"`
+	Description string             `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 // resolveParameterRef resolves a $ref parameter to its actual definition
@@ -247,4 +250,39 @@ func convertSchemaToProperty(schema *Schema) *Schema {
 	}
 
 	return prop
+}
+
+// UnmarshalOpenAPISpecFromJSON unmarshals OpenAPI spec from JSON data
+func UnmarshalOpenAPISpecFromJSON(data []byte) (*OpenAPISpec, error) {
+	var spec OpenAPISpec
+	err := json.Unmarshal(data, &spec)
+	if err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
+
+// UnmarshalOpenAPISpecFromYAML unmarshals OpenAPI spec from YAML data
+func UnmarshalOpenAPISpecFromYAML(data []byte) (*OpenAPISpec, error) {
+	var spec OpenAPISpec
+	err := yaml.Unmarshal(data, &spec)
+	if err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
+
+// UnmarshalOpenAPISpec unmarshals OpenAPI spec from data, automatically detecting format (JSON or YAML)
+func UnmarshalOpenAPISpec(data []byte) (*OpenAPISpec, error) {
+	// Try JSON first
+	var spec OpenAPISpec
+	err := json.Unmarshal(data, &spec)
+	if err != nil {
+		// If JSON fails, try YAML
+		err = yaml.Unmarshal(data, &spec)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &spec, nil
 }
