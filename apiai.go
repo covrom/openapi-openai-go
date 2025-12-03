@@ -38,9 +38,10 @@ type FunctionDefinition struct {
 
 // OpenAPISpec represents an OpenAPI 3.x specification
 type OpenAPISpec struct {
-	OpenAPI string              `json:"openapi"`
-	Paths   map[string]PathItem `json:"paths"`
-	Info    Info                `json:"info"`
+	OpenAPI    string              `json:"openapi"`
+	Paths      map[string]PathItem `json:"paths"`
+	Info       Info                `json:"info"`
+	Components *Components         `json:"components,omitempty"`
 }
 
 // Info contains API metadata
@@ -48,6 +49,11 @@ type Info struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Version     string `json:"version"`
+}
+
+// Components contains reusable objects
+type Components struct {
+	Parameters map[string]Parameter `json:"parameters,omitempty"`
 }
 
 // PathItem represents a path in the OpenAPI spec
@@ -95,6 +101,7 @@ type Parameter struct {
 	Description string  `json:"description"`
 	Required    bool    `json:"required"`
 	Schema      *Schema `json:"schema"`
+	Ref         string  `json:"$ref,omitempty"`
 }
 
 // RequestBody represents the request body definition
@@ -114,6 +121,23 @@ type Schema struct {
 	Required    []string           `json:"required,omitempty"`
 	Format      string             `json:"format,omitempty"`
 	Description string             `json:"description,omitempty"`
+}
+
+// resolveParameterRef resolves a $ref parameter to its actual definition
+func resolveParameterRef(param Parameter, spec *OpenAPISpec) Parameter {
+	if param.Ref != "" && spec.Components != nil && spec.Components.Parameters != nil {
+		// Extract parameter name from $ref, e.g., "#/components/parameters/offsetParam" -> "offsetParam"
+		refParts := strings.Split(param.Ref, "/")
+		if len(refParts) == 4 && refParts[0] == "#" && refParts[1] == "components" && refParts[2] == "parameters" {
+			paramName := refParts[3]
+			if referencedParam, exists := spec.Components.Parameters[paramName]; exists {
+				// Return the referenced parameter
+				return referencedParam
+			}
+		}
+	}
+	// Return the original parameter if no reference is found
+	return param
 }
 
 // ConvertOpenAPIToFunctions converts OpenAPI spec to LLM function definitions
@@ -149,19 +173,22 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 
 			// Handle path and query parameters
 			for _, param := range op.Parameters {
-				if param.In == "path" || param.In == "query" {
-					prop := convertSchemaToProperty(param.Schema)
-					prop.Description = param.Description
-					params.Properties[param.Name] = prop
+				// Resolve $ref if present
+				resolvedParam := resolveParameterRef(param, spec)
 
-					if param.Required {
-						params.Required = append(params.Required, param.Name)
+				if resolvedParam.In == "path" || resolvedParam.In == "query" {
+					prop := convertSchemaToProperty(resolvedParam.Schema)
+					prop.Description = resolvedParam.Description
+					params.Properties[resolvedParam.Name] = prop
+
+					if resolvedParam.Required {
+						params.Required = append(params.Required, resolvedParam.Name)
 					}
 
-					if param.In == "path" {
-						pathParams = append(pathParams, param.Name)
+					if resolvedParam.In == "path" {
+						pathParams = append(pathParams, resolvedParam.Name)
 					} else {
-						queryParams = append(queryParams, param.Name)
+						queryParams = append(queryParams, resolvedParam.Name)
 					}
 				}
 			}
