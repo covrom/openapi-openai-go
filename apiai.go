@@ -128,7 +128,7 @@ func ConvertOpenAPIToFunctions(spec *OpenAPISpec) map[string]*FunctionDefinition
 
 			funcDef := &FunctionDefinition{
 				Name:        sanitizeFunctionName(path, method),
-				Description: op.Summary,
+				Description: strings.Join([]string{op.Summary, op.Description}, "\n"),
 				OapiMethod:  method,
 				OapiPath:    path,
 			}
