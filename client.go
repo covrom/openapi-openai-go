@@ -109,6 +109,53 @@ func (art *AuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 // NewHTTPClient creates an http.Client with the specified authentication.
+// Usage examples
+//
+// Example 1: Basic Auth
+// client1 := NewHTTPClient(&AuthConfig{
+// 	Type:     AuthTypeBasic,
+// 	Username: "admin",
+// 	Password: "secret",
+// })
+//
+// Example 2: API Key in header
+// client2 := NewHTTPClient(&AuthConfig{
+// 	Type:        AuthTypeAPIKeyHeader,
+// 	APIKeyName:  "X-API-Key",
+// 	APIKeyValue: "12345-abcde",
+// })
+//
+// Example 3: Bearer Token
+// client3 := NewHTTPClient(&AuthConfig{
+// 	Type:  AuthTypeBearer,
+// 	Token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+// })
+//
+// Example 4: OAuth2 with custom TokenSource
+// oauth2Config := &oauth2.Config{...}
+// ts := oauth2Config.TokenSource(context.Background(), token)
+// client4 := NewHTTPClient(&AuthConfig{
+// 	Type:         AuthTypeOAuth2,
+// 	TokenSource:  nil, // can pass oauth2.TokenSource
+// 	Token:        "access_token_here", // fallback
+// })
+//
+// Example 5: Cookie Auth
+// client5 := NewHTTPClient(&AuthConfig{
+// 	Type: AuthTypeCookie,
+// 	Cookies: []*http.Cookie{
+// 		{Name: "sessionid", Value: "abc123"},
+// 		{Name: "csrftoken", Value: "xyz789"},
+// 	},
+// })
+//
+// Use it
+// resp, err := client1.Get("https://httpbin.org/basic-auth/admin/secret")
+// if err != nil {
+// 	panic(err)
+// }
+// defer resp.Body.Close()
+// fmt.Println("Status:", resp.Status)
 func NewHTTPClient(config *AuthConfig, opts ...func(*http.Client)) *http.Client {
 	// Base transport (can be customized)
 	transport := &http.Transport{
@@ -138,51 +185,3 @@ func NewHTTPClient(config *AuthConfig, opts ...func(*http.Client)) *http.Client 
 
 	return client
 }
-
-// Usage examples
-
-// Example 1: Basic Auth
-// client1 := NewHTTPClient(&AuthConfig{
-// 	Type:     AuthTypeBasic,
-// 	Username: "admin",
-// 	Password: "secret",
-// })
-
-// Example 2: API Key in header
-// client2 := NewHTTPClient(&AuthConfig{
-// 	Type:        AuthTypeAPIKeyHeader,
-// 	APIKeyName:  "X-API-Key",
-// 	APIKeyValue: "12345-abcde",
-// })
-
-// Example 3: Bearer Token
-// client3 := NewHTTPClient(&AuthConfig{
-// 	Type:  AuthTypeBearer,
-// 	Token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-// })
-
-// Example 4: OAuth2 with custom TokenSource
-// oauth2Config := &oauth2.Config{...}
-// ts := oauth2Config.TokenSource(context.Background(), token)
-// client4 := NewHTTPClient(&AuthConfig{
-// 	Type:         AuthTypeOAuth2,
-// 	TokenSource:  nil, // can pass oauth2.TokenSource
-// 	Token:        "access_token_here", // fallback
-// })
-
-// Example 5: Cookie Auth
-// client5 := NewHTTPClient(&AuthConfig{
-// 	Type: AuthTypeCookie,
-// 	Cookies: []*http.Cookie{
-// 		{Name: "sessionid", Value: "abc123"},
-// 		{Name: "csrftoken", Value: "xyz789"},
-// 	},
-// })
-
-// Use it
-// resp, err := client1.Get("https://httpbin.org/basic-auth/admin/secret")
-// if err != nil {
-// 	panic(err)
-// }
-// defer resp.Body.Close()
-// fmt.Println("Status:", resp.Status)
